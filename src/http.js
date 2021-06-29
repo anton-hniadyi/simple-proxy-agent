@@ -39,21 +39,30 @@ HTTP.prototype.addRequest = function(req, options) {
 };
 
 HTTP.prototype.createConnection = function(options) {
+  let self = options.agent;
   return new Promise((resolve, reject) => {
     const ssl = options.protocol ? options.protocol.toLowerCase() === 'https:' : false;
-    if(ssl && this.options.tunnel === true) {
+    if(ssl && self.options.tunnel === true) {
       if(options.port === 80) options.port = 443;
       // CONNECT Method
+      function buildAuthHeader(user, pass) {
+        return 'Basic ' + new Buffer(user + ':' + pass).toString('base64');
+      }
+      let resOfSplit = self.proxy.auth.split(':');
+      let user = resOfSplit[0];
+      let pass = resOfSplit[1];
+
       const req = http.request({
-        host: this.proxy.hostname,
-        port: this.proxy.port,
-        auth: this.proxy.auth,
+        host: self.proxy.hostname,
+        port: self.proxy.port,
+        auth: self.proxy.auth,
         method: 'CONNECT',
         path: (options.hostname || options.host) + ":" + options.port,
         headers: {
-          host: options.host
+          host: options.host,
+          'Proxy-Authorization': buildAuthHeader(user, pass),
         },
-        timeout: this.options.timeout
+        timeout: self.options.timeout
       });
 
       req.once('connect', (res, socket, head) => {
@@ -62,6 +71,8 @@ HTTP.prototype.createConnection = function(options) {
           host: options.hostname || options.host,
           port: +options.port,
           servername: options.servername || options.host
+        }, function () {
+          let stop = true;
         });
         resolve(tunnel);
       });
@@ -75,16 +86,17 @@ HTTP.prototype.createConnection = function(options) {
         reject(err);
       });
 
-      req.once('close', () => {
+      req.once('close', (err) => {
+        console.error(err);
         reject(new Error('Tunnel failed. Socket closed prematurely'));
       });
 
       req.end();
     } else {
       const socket = net.connect({
-        host: this.proxy.host,
-        port: this.proxy.port,
-        auth: this.proxy.auth,
+        host: self.proxy.host,
+        port: self.proxy.port,
+        auth: self.proxy.auth,
       });
       resolve(socket);
     }
