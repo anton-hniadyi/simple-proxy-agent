@@ -87,7 +87,9 @@ HTTP.prototype.createConnection = function(options) {
       });
 
       req.once('close', (err) => {
-        console.error(err);
+        if (err) {
+          console.error(err);
+        }
         reject(new Error('Tunnel failed. Socket closed prematurely'));
       });
 
